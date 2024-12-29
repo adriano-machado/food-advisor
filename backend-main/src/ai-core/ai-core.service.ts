@@ -18,7 +18,7 @@ export class AiCoreService {
 
   async parseAIResponse(rawResponse: string): Promise<AIResponse> {
     try {
-      const cleanResponse = this.cleanAIResponse(rawResponse);
+      const cleanResponse = this.cleanOpenAIResponse(rawResponse);
       console.log({ cleanResponse });
       const jsonResponse = JSON.parse(cleanResponse);
       return aiResponseSchema.parse(jsonResponse);
@@ -33,7 +33,7 @@ export class AiCoreService {
     }
   }
 
-  private cleanAIResponse(rawResponse: string): string {
+  private cleanOpenAIResponse(rawResponse: string): string {
     let cleanedResponse = rawResponse.trim();
 
     // Remove markdown code block syntax if present
@@ -45,35 +45,21 @@ export class AiCoreService {
     // Remove any leading/trailing whitespace or newlines
     cleanedResponse = cleanedResponse.trim();
 
+    // Try to find the last complete object by looking for the last closing brace
+    const lastBraceIndex = cleanedResponse.lastIndexOf('}');
+    if (lastBraceIndex === -1) {
+      throw new Error('No valid JSON object found in response');
+    }
+
+    // Take only up to the last complete object
+    cleanedResponse = cleanedResponse.substring(0, lastBraceIndex + 1);
+
+    // Validate that we have valid JSON
     try {
-      // Try parsing as-is first
-      const parsed = JSON.parse(cleanedResponse);
-
-      // Ensure required fields exist with default values
-      const response = {
-        items: parsed.items || [],
-        total_calories: parsed.total_calories || 0, // Default to 0 if missing
-        meal_type: parsed.meal_type || 'snack', // Default to 'snack' if missing
-      };
-
-      return JSON.stringify(response);
-    } catch (e) {
-      // If parsing fails, attempt to fix truncated JSON
-      const items = cleanedResponse.match(/"items":\s*\[([\s\S]*)/);
-      if (items) {
-        // Extract all complete items
-        const itemRegex = /\s*{\s*"name":[^}]+}/g;
-        const completeItems = items[1].match(itemRegex) || [];
-
-        // Construct valid JSON with required fields
-        return JSON.stringify({
-          items: completeItems.map((item) => JSON.parse(item)),
-          total_calories: 0, // Default value
-          meal_type: 'snack', // Default value
-        });
-      }
-
-      throw new Error('Unable to parse or fix the JSON response');
+      JSON.parse(cleanedResponse);
+      return cleanedResponse;
+    } catch {
+      throw new Error('Unable to parse JSON response');
     }
   }
 }

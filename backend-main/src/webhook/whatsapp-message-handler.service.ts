@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { AiCoreService } from 'src/ai-core/ai-core.service';
+import { formatResponseToMessage } from 'src/ai-core/utils';
 import { WhatsappWebhookConfig } from 'src/core/config/webhook.config';
 import { WhatsappHttpService } from '../core/whatsapp-http/whatsapp-http.service';
 import {
@@ -65,10 +66,10 @@ export class WhatsappMessageHandlerService {
           const analysisJson =
             await this.aiCoreService.promptWithImage(imageUrl);
           console.log({ analysisJson });
-
+          const formattedResponse = formatResponseToMessage(analysisJson);
           await this.whatsappHttpService.sendWhatsAppMessage(
             message.from,
-            JSON.stringify(analysisJson),
+            formattedResponse,
           );
           break;
       }
