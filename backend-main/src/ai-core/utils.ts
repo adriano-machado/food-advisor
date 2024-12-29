@@ -55,5 +55,5 @@ export function formatResponseToMessage(response: AIResponse): string {
         }`
       : '';
 
-  return `${itemsList}${summary}${macros}${qualityInfo}`;
+  return `🍽️ Análise da Refeição\n\n${itemsList}${summary}${macros}${qualityInfo}`;
 }
