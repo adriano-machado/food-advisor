@@ -1,17 +1,59 @@
 import { AIResponse } from './ai-response.type';
 
 export function formatResponseToMessage(response: AIResponse): string {
-  const mealHeader = `🍽️ ${response.meal_type.charAt(0).toUpperCase() + response.meal_type.slice(1)}`;
+  // Cabeçalho da refeição com tipo e confiança
+  //   const confidenceInfo = `Confiança da Análise: ${(response.analysis_quality.overall_confidence * 100).toFixed(1)}%`;
 
+  // Detalhamento dos itens
   const itemsList = response.items
-    .map(
-      (item) =>
-        `• ${item.name} (${item.estimated_calories} cal)\n` +
-        `  ${item.description}`,
-    )
+    .map((item) => {
+      const confidence = (item.confidence_score * 100).toFixed(1);
+      const nutrition = item.nutritional_info;
+
+      return `• ${item.name} (${confidence}% de confiança)
+  Peso: ${item.estimated_weight_grams}g
+  Descrição: ${item.description}
+  Nutrição:
+    - Calorias: ${nutrition.calories} cal
+    - Proteína: ${nutrition.protein_grams}g
+    - Carboidratos: ${nutrition.carbs_grams}g
+    - Gordura: ${nutrition.fat_grams}g
+    - Fibra: ${nutrition.fiber_grams}g${
+      item.uncertainty_factors.length > 0
+        ? `\n  Observação: ${item.uncertainty_factors.join(', ')}`
+        : ''
+    }`;
+    })
     .join('\n\n');
 
-  const totalCalories = `\n\nTotal Calories: ${response.total_calories}`;
+  // Seção de resumo da refeição
+  const summary = `\n\n📊 Resumo da Refeição:
+• Total de Calorias: ${response.meal_summary.total_calories} cal
+• Total de Proteína: ${response.meal_summary.total_protein}g
+• Total de Carboidratos: ${response.meal_summary.total_carbs}g
+• Total de Gordura: ${response.meal_summary.total_fat}g
+• Total de Fibra: ${response.meal_summary.total_fiber}g`;
 
-  return `${mealHeader}\n\n${itemsList}${totalCalories}`;
+  // Distribuição de macronutrientes
+  const macros = `\n\n🎯 Distribuição de Macronutrientes:
+• Proteína: ${response.macronutrient_distribution.protein_percentage.toFixed(1)}%
+• Carboidratos: ${response.macronutrient_distribution.carbs_percentage.toFixed(1)}%
+• Gordura: ${response.macronutrient_distribution.fat_percentage.toFixed(1)}%`;
+
+  // Problemas de qualidade e sugestões, se houver
+  const qualityInfo =
+    response.analysis_quality.quality_issues.length > 0 ||
+    response.analysis_quality.improvement_suggestions.length > 0
+      ? `\n\n⚠️ Notas da Análise:${
+          response.analysis_quality.quality_issues.length > 0
+            ? `\nProblemas de Qualidade:\n${response.analysis_quality.quality_issues.map((issue) => `• ${issue}`).join('\n')}`
+            : ''
+        }${
+          response.analysis_quality.improvement_suggestions.length > 0
+            ? `\nSugestões para Melhor Análise:\n${response.analysis_quality.improvement_suggestions.map((suggestion) => `• ${suggestion}`).join('\n')}`
+            : ''
+        }`
+      : '';
+
+  return `${itemsList}${summary}${macros}${qualityInfo}`;
 }
