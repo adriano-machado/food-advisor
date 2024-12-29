@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
+import { AiCoreService } from 'src/ai-core/ai-core.service';
 import { WhatsappWebhookConfig } from 'src/core/config/webhook.config';
 import { WhatsappHttpService } from '../core/whatsapp-http/whatsapp-http.service';
 import {
@@ -8,11 +9,12 @@ import {
 } from './dto/webhook-payload.dto';
 
 @Injectable()
-export class WebhookHandlerService {
+export class WhatsappMessageHandlerService {
   constructor(
     @Inject(WhatsappWebhookConfig.KEY)
     private config: ConfigType<typeof WhatsappWebhookConfig>,
     private readonly whatsappHttpService: WhatsappHttpService,
+    private readonly aiCoreService: AiCoreService,
   ) {}
 
   verifyWebhook(mode: string, token: string, challenge: string) {
@@ -47,7 +49,6 @@ export class WebhookHandlerService {
       switch (message.type) {
         case 'text':
           if (!message.text) break;
-          console.log('Text:', message.text.body);
           await this.whatsappHttpService.sendWhatsAppMessage(
             message.from,
             'Hello World',
@@ -56,22 +57,19 @@ export class WebhookHandlerService {
 
         case 'image':
           if (!message.image) break;
-          console.log('Image:', {
-            id: message.image.id,
-            caption: message.image.caption || 'No caption',
-          });
+
           const imageUrl = await this.whatsappHttpService.downloadWhatsAppMedia(
             message.image.id,
           );
-          console.log({ imageUrl });
+
+          const analysisJson =
+            await this.aiCoreService.promptWithImage(imageUrl);
+          console.log({ analysisJson });
+
           await this.whatsappHttpService.sendWhatsAppMessage(
             message.from,
-            'FUNCIONOU',
+            JSON.stringify(analysisJson),
           );
-          // Note: You'll need to inject and use aiService and formatService here
-          // const analysisJson = await this.aiService.analyzeImage(imageUrl);
-          // const formattedResponse = this.formatService.formatMealAnalysis(analysisJson);
-          // await this.sendWhatsAppMessage(message.from, formattedResponse);
           break;
       }
     } catch (error) {
@@ -83,7 +81,7 @@ export class WebhookHandlerService {
     }
   }
 
-  async handleWebhookPayload(payload: WebhookPayloadDto) {
+  async handleIncommingWhatsAppMessage(payload: WebhookPayloadDto) {
     console.log('Processing webhook payload:', JSON.stringify(payload));
 
     if (payload.object === 'whatsapp_business_account') {

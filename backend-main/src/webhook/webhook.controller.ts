@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { WebhookPayloadDto } from './dto/webhook-payload.dto';
-import { WebhookHandlerService } from './webhook-handler.service';
+import { WhatsappMessageHandlerService } from './whatsapp-message-handler.service';
 
 @Controller('webhook')
 export class WebhookController {
-  constructor(private readonly webhookHandlerService: WebhookHandlerService) {}
+  constructor(
+    private readonly whatsappMessageHandlerService: WhatsappMessageHandlerService,
+  ) {}
 
   @Get()
   verifyWebhook(
@@ -12,11 +14,18 @@ export class WebhookController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
   ) {
-    return this.webhookHandlerService.verifyWebhook(mode, token, challenge);
+    return this.whatsappMessageHandlerService.verifyWebhook(
+      mode,
+      token,
+      challenge,
+    );
   }
 
   @Post()
   handleWebhook(@Body() payload: WebhookPayloadDto) {
-    return this.webhookHandlerService.handleWebhookPayload(payload);
+    console.log({ payload: JSON.stringify(payload) });
+    return this.whatsappMessageHandlerService.handleIncommingWhatsAppMessage(
+      payload,
+    );
   }
 }
