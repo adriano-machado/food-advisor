@@ -55,7 +55,7 @@ export class WhatsappHttpService {
 
   async downloadWhatsAppMedia(mediaId: string): Promise<string> {
     try {
-      // First, get the media URL
+      // Step 1: Get the media URL
       const mediaUrlResponse = await firstValueFrom(
         this.httpService.get(`${this.baseUrl}/${mediaId}`, {
           headers: {
@@ -64,19 +64,40 @@ export class WhatsappHttpService {
         }),
       );
 
-      // Download the media from the URL
-      const mediaResponse = await firstValueFrom(
-        this.httpService.get<ArrayBuffer>(mediaUrlResponse.data.url, {
+      // Step 2: Changed from arraybuffer to stream
+      const mediaStream = await firstValueFrom(
+        this.httpService.get(mediaUrlResponse.data.url, {
           headers: {
             Authorization: `Bearer ${this.appSecret}`,
           },
-          responseType: 'arraybuffer',
+          responseType: 'stream',
         }),
       );
 
-      // Convert the media to base64
-      const base64Image = Buffer.from(mediaResponse.data).toString('base64');
-      return `data:${mediaUrlResponse.data.mime_type};base64,${base64Image}`;
+      // Step 3: New streaming implementation
+      return new Promise((resolve, reject) => {
+        const chunks: any[] = [];
+
+        // Event: Receive a chunk of data
+        mediaStream.data.on('data', (chunk: any) => chunks.push(chunk));
+
+        // Event: Handle any errors during streaming
+        mediaStream.data.on('error', (err: any) => reject(err));
+
+        // Event: Stream is complete
+        mediaStream.data.on('end', () => {
+          // Combine all chunks into a single buffer
+          const buffer = Buffer.concat(chunks);
+
+          // Convert the final buffer to base64
+          const base64Image = buffer.toString('base64');
+
+          // Return the complete base64 string with mime type
+          resolve(
+            `data:${mediaUrlResponse.data.mime_type};base64,${base64Image}`,
+          );
+        });
+      });
     } catch (error: any) {
       console.error(
         'Error downloading WhatsApp media:',
