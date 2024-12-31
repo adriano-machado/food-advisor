@@ -59,12 +59,6 @@ export class WhatsappMessageHandlerService {
         case 'image':
           if (!message.image) break;
 
-          // Send acknowledgment immediately
-          await this.whatsappHttpService.sendWhatsAppMessage(
-            message.from,
-            'I am processing your image...',
-          );
-
           // Process image asynchronously
           this.processImageMessage(message).catch((error) => {
             console.error('Error processing image:', error);
@@ -103,15 +97,25 @@ export class WhatsappMessageHandlerService {
     console.log('Processing webhook payload:', JSON.stringify(payload));
 
     if (payload.object === 'whatsapp_business_account') {
-      for (const entry of payload.entry) {
-        for (const change of entry.changes) {
-          if (change.value.messages) {
-            for (const message of change.value.messages) {
-              await this.processWhatsAppMessage(message);
-            }
-          }
-        }
-      }
+      const from = payload.entry[0].changes[0].value.messages[0].from;
+      await this.whatsappHttpService.sendWhatsAppMessage(
+        from,
+        'I am processing your image...',
+      );
+      // Process each message independently
+      payload.entry.forEach((entry) => {
+        entry.changes.forEach((change) => {
+          (change.value.messages || []).forEach((message) => {
+            // Fire and forget - don't wait
+            this.processWhatsAppMessage(message).catch((error) => {
+              console.error('Failed to process message:', error);
+            });
+          });
+        });
+      });
     }
+
+    // Return immediately after initiating all processes
+    return { status: 'messages_received' };
   }
 }
