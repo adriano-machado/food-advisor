@@ -59,18 +59,20 @@ export class WhatsappMessageHandlerService {
         case 'image':
           if (!message.image) break;
 
-          const imageUrl = await this.whatsappHttpService.downloadWhatsAppMedia(
-            message.image.id,
-          );
-
-          const analysisJson =
-            await this.aiCoreService.promptWithImage(imageUrl);
-          console.log({ analysisJson });
-          const formattedResponse = formatResponseToMessage(analysisJson);
+          // Send acknowledgment immediately
           await this.whatsappHttpService.sendWhatsAppMessage(
             message.from,
-            formattedResponse,
+            'I am processing your image...',
           );
+
+          // Process image asynchronously
+          this.processImageMessage(message).catch((error) => {
+            console.error('Error processing image:', error);
+            this.whatsappHttpService.sendWhatsAppMessage(
+              message.from,
+              '❌ Sorry, I encountered an error while processing your image.',
+            );
+          });
           break;
       }
     } catch (error) {
@@ -80,6 +82,21 @@ export class WhatsappMessageHandlerService {
         '❌ Sorry, I encountered an error while processing your message.',
       );
     }
+  }
+
+  private async processImageMessage(message: WhatsAppMessageDto) {
+    const imageUrl = await this.whatsappHttpService.downloadWhatsAppMedia(
+      message.image.id,
+    );
+
+    const analysisJson = await this.aiCoreService.promptWithImage(imageUrl);
+    console.log({ analysisJson });
+
+    const formattedResponse = formatResponseToMessage(analysisJson);
+    await this.whatsappHttpService.sendWhatsAppMessage(
+      message.from,
+      formattedResponse,
+    );
   }
 
   async handleIncommingWhatsAppMessage(payload: WebhookPayloadDto) {
