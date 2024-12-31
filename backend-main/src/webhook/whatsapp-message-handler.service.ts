@@ -97,38 +97,46 @@ export class WhatsappMessageHandlerService {
     console.log('Processing webhook payload:', JSON.stringify(payload));
 
     if (payload.object === 'whatsapp_business_account') {
-      // Validate payload structure before accessing properties
-      if (
-        !payload.entry?.length ||
-        !payload.entry[0]?.changes?.length ||
-        !payload.entry[0].changes[0]?.value?.messages?.length
-      ) {
-        console.warn('Received invalid payload structure:', payload);
-        return { status: 'invalid_payload_structure' };
+      if (!payload.entry?.length) {
+        console.warn('No entries in payload:', payload);
+        return { status: 'no_entries' };
       }
 
-      const from = payload.entry[0].changes[0].value.messages[0].from;
-      await this.whatsappHttpService.sendWhatsAppMessage(
-        from,
-        'I am processing your image...',
-      );
+      for (const entry of payload.entry) {
+        for (const change of entry.changes || []) {
+          const value = change.value;
 
-      // Process each message independently
-      payload.entry.forEach((entry) => {
-        entry.changes.forEach((change) => {
-          if (change.value.messages) {
-            change.value.messages.forEach((message) => {
-              // Fire and forget - don't wait
+          // Handle messages
+          if (value.messages?.length) {
+            const from = value.messages[0].from;
+            // Send the processing message only when we receive a message
+            await this.whatsappHttpService.sendWhatsAppMessage(
+              from,
+              'I am processing your image...',
+            );
+
+            for (const message of value.messages) {
               this.processWhatsAppMessage(message).catch((error) => {
                 console.error('Failed to process message:', error);
               });
-            });
+            }
           }
-        });
-      });
+
+          // Handle status updates
+          if (value.statuses?.length) {
+            for (const status of value.statuses) {
+              console.log('Message status update:', {
+                id: status.id,
+                status: status.status,
+                timestamp: status.timestamp,
+                recipient: status.recipient_id,
+              });
+            }
+          }
+        }
+      }
     }
 
-    // Return immediately after initiating all processes
-    return { status: 'messages_received' };
+    return { status: 'processed' };
   }
 }
