@@ -97,20 +97,33 @@ export class WhatsappMessageHandlerService {
     console.log('Processing webhook payload:', JSON.stringify(payload));
 
     if (payload.object === 'whatsapp_business_account') {
+      // Validate payload structure before accessing properties
+      if (
+        !payload.entry?.length ||
+        !payload.entry[0]?.changes?.length ||
+        !payload.entry[0].changes[0]?.value?.messages?.length
+      ) {
+        console.warn('Received invalid payload structure:', payload);
+        return { status: 'invalid_payload_structure' };
+      }
+
       const from = payload.entry[0].changes[0].value.messages[0].from;
       await this.whatsappHttpService.sendWhatsAppMessage(
         from,
         'I am processing your image...',
       );
+
       // Process each message independently
       payload.entry.forEach((entry) => {
         entry.changes.forEach((change) => {
-          (change.value.messages || []).forEach((message) => {
-            // Fire and forget - don't wait
-            this.processWhatsAppMessage(message).catch((error) => {
-              console.error('Failed to process message:', error);
+          if (change.value.messages) {
+            change.value.messages.forEach((message) => {
+              // Fire and forget - don't wait
+              this.processWhatsAppMessage(message).catch((error) => {
+                console.error('Failed to process message:', error);
+              });
             });
-          });
+          }
         });
       });
     }
