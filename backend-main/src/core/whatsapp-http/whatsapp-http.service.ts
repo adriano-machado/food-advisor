@@ -2,7 +2,6 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
-import sharp from 'sharp';
 
 @Injectable()
 export class WhatsappHttpService {
@@ -75,35 +74,28 @@ export class WhatsappHttpService {
         }),
       );
 
-      // Step 3: New streaming implementation with compression
+      // Step 3: New streaming implementation
       return new Promise((resolve, reject) => {
         const chunks: any[] = [];
 
+        // Event: Receive a chunk of data
         mediaStream.data.on('data', (chunk: any) => chunks.push(chunk));
+
+        // Event: Handle any errors during streaming
         mediaStream.data.on('error', (err: any) => reject(err));
-        mediaStream.data.on('end', async () => {
-          try {
-            const buffer = Buffer.concat(chunks);
 
-            // Compress the image using sharp
-            const compressedBuffer = await sharp(buffer)
-              .resize(800, 800, {
-                // Resize to max dimensions while maintaining aspect ratio
-                fit: 'inside',
-                withoutEnlargement: true,
-              })
-              .jpeg({
-                // Convert to JPEG and compress
-                quality: 80,
-                progressive: true,
-              })
-              .toBuffer();
+        // Event: Stream is complete
+        mediaStream.data.on('end', () => {
+          // Combine all chunks into a single buffer
+          const buffer = Buffer.concat(chunks);
 
-            const base64Image = compressedBuffer.toString('base64');
-            resolve(`data:image/jpeg;base64,${base64Image}`);
-          } catch (err) {
-            reject(err);
-          }
+          // Convert the final buffer to base64
+          const base64Image = buffer.toString('base64');
+
+          // Return the complete base64 string with mime type
+          resolve(
+            `data:${mediaUrlResponse.data.mime_type};base64,${base64Image}`,
+          );
         });
       });
     } catch (error: any) {
